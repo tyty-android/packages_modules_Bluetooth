@@ -5337,9 +5337,11 @@ public:
        * further.
        */
       if (!ReconfigureOrUpdateRemote(group, bluetooth::le_audio::types::kLeAudioDirectionSource)) {
-        log::error("Unable to reconfigure group at this time, configuration_context_type_ = {}",
-                   ToString(configuration_context_type_));
-        if (group->IsReleasing()) {
+        if (!group->IsPendingConfiguration()) {
+          log::error("Unable to reconfigure group at this time, configuration_context_type_ = {}",
+                     ToString(configuration_context_type_));
+        }
+        if (group->IsReleasing() && !group->IsPendingConfiguration()) {
           log::debug("Group is releasing, cancel streaming request and wait for release to end.");
           CancelLocalAudioSinkStreamingRequest();
           return;
@@ -5789,7 +5791,7 @@ public:
       if (sink_metadata.empty()) {
         audio_hal_check_completed_ = true;
         audio_hal_is_capable_to_send_empty_metadata_ = true;
-        return;
+        ReconfigureOrUpdateRemote(group, bluetooth::le_audio::types::kLeAudioDirectionSource);return;
       }
 
       if (!audio_hal_check_completed_) {
@@ -6583,8 +6585,7 @@ public:
 
         if ((audio_sender_state_ != AudioState::READY_TO_START &&
              audio_sender_state_ != AudioState::STARTED) &&
-            audio_receiver_state_ == AudioState::READY_TO_START &&
-            !audio_hal_is_capable_to_send_empty_metadata_) {
+            audio_receiver_state_ == AudioState::READY_TO_START) {
           /*
            * Warning - sending additional Local Source configuration for the Audio HAL which is
            * not capable to send empty metadata, as it has another issue with being not able to
